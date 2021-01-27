@@ -5,7 +5,7 @@
   },
   {
     "ParameterKey": "ProjectName",
-    "ParameterValue": "UdacityDevOps-Project"
+    "ParameterValue": "UdacityDevOps-Task"
   },
   {
     "ParameterKey": "PrivateSubnetMainCIDR",
