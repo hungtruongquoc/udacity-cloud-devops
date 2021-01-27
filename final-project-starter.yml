@@ -1,0 +1,387 @@
+Parameters:
+  # Parameters are entirely optional.
+  # but using them will make your cloudformation templates more reusable
+  # use them for things that may change over time, such as instance type,
+  # VPCs and so on.
+  ProjectName:
+    Description: Name of the project
+    Type: String
+
+  VpcCIDR:
+    Description: IP Range for VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  PrivateSubnetMainCIDR:
+    Description: IP Range for main private subnet
+    Type: String
+    Default: 10.0.1.0/24
+
+  PrivateSubnetBackupCIDR:
+    Description: IP Range for backup private subnet
+    Type: String
+    Default: 10.0.1.0/24
+
+  PublicSubnetMainCIDR:
+    Description: IP Range for main public subnet
+    Type: String
+    Default: 10.0.1.0/24
+
+  PublicSubnetBackupCIDR:
+    Description: IP Range for backup public subnet
+    Type: String
+    Default: 10.0.1.0/24
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Ref ProjectName
+        - Key: "For Project"
+          Value: !Ref ProjectName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref ProjectName
+        - Key: "For Project"
+          Value: !Ref ProjectName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PrivateSubnetMain:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnetMainCIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName} Main Private Subnet (AZ1)
+        - Key: "For Project"
+          Value: !Ref ProjectName
+
+  PrivateSubnetBackup:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PrivateSubnetBackupCIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName} Backup Private Subnet (AZ1)
+        - Key: "For Project"
+          Value: !Ref ProjectName
+
+  PublicSubnetMain:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetMainCIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName} Main Public Subnet (AZ1)
+        - Key: "For Project"
+          Value: !Ref ProjectName
+  #
+  PublicSubnetBackup:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnetBackupCIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName} Backup Public Subnet (AZ1)
+        - Key: "For Project"
+          Value: !Ref ProjectName
+  #
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  #
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnetMain
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnetBackup
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName} Public Routes
+        - Key: "For Project"
+          Value: !Ref ProjectName
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0 # Any addresses
+      GatewayId: !Ref InternetGateway # Route to this internet gateway
+
+  PublicSubnetMainRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetMain
+  #
+  PublicSubnetBackupRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnetBackup
+  #
+  PrivateRouteTableMain:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName} Private Routes (AZ0)
+  #
+  DefaultPrivateRouteMain:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableMain
+      DestinationCidrBlock: 0.0.0.0/0 # Any addresses
+      NatGatewayId: !Ref NatGateway1 # Route to this nat gateway
+  #
+  PrivateSubnetMainRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableMain
+      SubnetId: !Ref PrivateSubnetMain
+  #
+  PrivateRouteTableBackup:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName} Private Routes (AZ1)
+  #
+  DefaultPrivateRouteBackup:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableBackup
+      DestinationCidrBlock: 0.0.0.0/0 # Any addresses
+      NatGatewayId: !Ref NatGateway2 # Route to this nat gateway
+  #
+  PrivateSubnetBackupRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableBackup
+      SubnetId: !Ref PrivateSubnetBackup
+  #
+  #  LBSecGroup:
+  #    Type: AWS::EC2::SecurityGroup
+  #    Properties:
+  #      GroupDescription: Allow http to our load balancer
+  #      VpcId:
+  #        Fn::ImportValue:
+  #          !Sub "${ProjectName}-VPCID"
+  #      SecurityGroupEgress:
+  #        - IpProtocol: tcp
+  #          FromPort: 80
+  #          ToPort: 80
+  #          CidrIp: 0.0.0.0/0
+  #      SecurityGroupIngress:
+  #        - IpProtocol: tcp
+  #          FromPort: 80
+  #          ToPort: 80
+  #          CidrIp: 0.0.0.0/0
+  #
+  #  WebServerSecGroup:
+  #    Type: AWS::EC2::SecurityGroup
+  #    Properties:
+  #      GroupDescription: Allow http and SSH to our web servers
+  #      VpcId:
+  #        Fn::ImportValue:
+  #          !Sub "${ProjectName}-VPCID"
+  #      SecurityGroupEgress:
+  #        - IpProtocol: tcp
+  #          FromPort: 80
+  #          ToPort: 80
+  #          CidrIp: 0.0.0.0/0
+  #        - IpProtocol: tcp
+  #          FromPort: 22
+  #          ToPort: 22
+  #          CidrIp: 0.0.0.0/0
+  #      SecurityGroupIngress:
+  #        - IpProtocol: tcp
+  #          FromPort: 0
+  #          ToPort: 65535
+  #          CidrIp: 0.0.0.0/0
+  # Instance profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
+  # never give too much permissions to your EC2 instances! if they get hacked, the permissions get hacked also!
+  # in this example, I create a Role called UdacityS3ReadOnlyC2 and just give it a policy of S3 Read-Only Access
+  #  ProfileWithRolesForOurApp:
+  #    Type: AWS::IAM::InstanceProfile
+  #    Properties:
+  #      Roles:
+  #        - UdacityS3ReadOnlyEC2
+Outputs:
+  # This is also optional.
+  # Bonus points for useful outputs!
+  # for example, if you create a Load Balancer
+  # it's nice to output the URL to it here, so that we don't have to go to the console to get it.
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${ProjectName}-VPCID
+
+  InternetGateWay:
+    Description: A reference to the created Internet gateway
+    Value: !Ref InternetGateway
+
+  VPCPublicRouteTable:
+    Description: Public Routing
+    Value: !Ref PublicRouteTable
+    Export:
+      Name: !Sub ${ProjectName}-PUB-RT
+  #
+  VPCPrivateRouteTableMain:
+    Description: Private Routing
+    Value: !Ref PrivateRouteTableMain
+    Export:
+      Name: !Sub ${ProjectName}-PRI-MAIN-RT
+  #
+  #  VPCPrivateRouteTableBackup:
+  #    Description: Private Routing Backup
+  #    Value: !Ref PrivateRouteTableBackup
+  #    Export:
+  #      Name: !Sub ${ProjectName}-PRI-BK-RT
+  #
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnetMain, !Ref PrivateSubnetBackup ] ]
+    Export:
+      Name: !Sub ${ProjectName}-PRIVATE-NETS
+
+  PublicSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref PublicSubnetMain, !Ref PublicSubnetBackup ] ]
+    Export:
+      Name: !Sub ${ProjectName}-PUBLIC-NETS
+
+  PrivateSubnetBackup:
+    Description: A reference to the backup private subnet
+    Value: !Ref PrivateSubnetBackup
+    Export:
+      Name: !Sub ${ProjectName}-BK-PRIVATE-SN
+
+  PrivateSubnetMain:
+    Description: A reference to the main private subnet
+    Value: !Ref PrivateSubnetMain
+    Export:
+      Name: !Sub ${ProjectName}-MAIN-PRIVATE-SN
+
+  PublicSubnetMain:
+    Description: A reference to the main public subnet
+    Value: !Ref PublicSubnetMain
+    Export:
+      Name: !Sub ${ProjectName}-MAIN-PUBLIC-SN
+
+  PublicSubnetBackup:
+    Description: A reference to the backup public subnet
+    Value: !Ref PublicSubnetBackup
+    Export:
+      Name: !Sub ${ProjectName}-BK-PUBLIC-SN
+
+  ElasticIP1:
+    Description: Information about the ElasticIP1
+    Value: !Ref NatGateway1EIP
+
+  ElasticIP2:
+    Description: Information about the ElasticIP2
+    Value: !Ref NatGateway2EIP
+
+  NatGateway1:
+    Description: Information about the NatGateway1
+    Value: !Ref NatGateway1
+
+  NatGateway2:
+    Description: Information about the NatGateway2
+    Value: !Ref NatGateway2
+
+  PublicRoute:
+    Description: Information about the public route
+    Value: !Ref DefaultPublicRoute
+
+  SubnetRouteTableAssociationPublicMain:
+    Description: The connection between main public subnet and public route table
+    Value: !Ref PublicSubnetMainRouteTableAssociation
+
+  SubnetRouteTableAssociationPublicBackup:
+    Description: The connection between back up public subnet and public route table
+    Value: !Ref PublicSubnetBackupRouteTableAssociation
+
+  PrivateRouteMain:
+    Description: Information about the private route
+    Value: !Ref DefaultPrivateRouteMain
+
+  SubnetRouteTableAssociationMainPrivateSubnet:
+    Description: The connection between private main subnet and main private route table
+    Value: !Ref PrivateSubnetMainRouteTableAssociation
+
+  PrivateRouteTableBackup:
+    Description: The route table for back up private subnet
+    Value: !Ref PrivateRouteTableBackup
+
+  DefaultBackupPrivateRoute:
+    Description: The route for backup private subnet
+    Value: !Ref DefaultPrivateRouteBackup
+
+  SubnetRouteTableAssociationBackupPrivateSubnet:
+    Description: The association between the backup private subnet and route table
+    Value: !Ref PrivateSubnetBackupRouteTableAssociation
+# Sample UserData
+# When creating your Launch Configuration, you may need a UserData script
+# here's one that you can use for Ubuntu Linux that will:
+# Install Apache Web Server, Start it, and create an index.html that will be displayed
+# when you visit the IP address of this server with your web browser
+#Here it is:
+#
+#          #!/bin/bash
+#          apt-get update -y
+#          apt-get install apache2 -y
+#          systemctl start apache2.service
+#          cd /var/www/html
+#          echo "Udacity Demo Web Server Up and Running!" > index.html

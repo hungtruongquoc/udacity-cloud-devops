@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "ProjectName",
+    "ParameterValue": "UdacityDevOps-Task"
+  },
+  {
+    "ParameterKey": "EC2AMI",
+    "ParameterValue": "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+  },
+  {
+    "ParameterKey": "EC2InstanceType",
+    "ParameterValue": "t2.micro"
+  },
+  {
+    "ParameterKey": "SshKeyName",
+    "ParameterValue": "udacity-project-keys"
+  },
+  {
+    "ParameterKey": "BastionHostExternalKey",
+    "ParameterValue": "bastion_host_external"
+  }
+]
