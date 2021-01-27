@@ -83,7 +83,8 @@ Resources:
           cd /var/www/html
           echo "Udacity Demo Web Server Up and Running!" > index.html
 
-      ImageId: ami-005bdb005fb00e791
+#      ImageId: ami-0a87a7625a4f44ffb
+      ImageId: ami-07a29e5e945228fa1
       #      IamInstanceProfile: !Ref ProfileWithRolesForOurApp
       SecurityGroups:
         - Ref: WebServerSecGroup
@@ -276,6 +277,14 @@ Outputs:
   BastionInstance:
     Description: ID of the bastion instance
     Value: !Ref BastionInstance
+
+  BastionInstancePublicIp:
+    Description: Public value of the bastion host
+    Value: !GetAtt BastionInstance.PublicIp
+
+  BastionInstancePublicDomain:
+    Description: Public domain of the bastion host
+    Value: !GetAtt BastionInstance.PublicDnsName
 
   StackName:
     Description: Test of the stack
