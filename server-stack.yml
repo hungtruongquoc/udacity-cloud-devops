@@ -82,7 +82,6 @@ Resources:
       SecurityGroups:
         - Ref: WebServerSecGroup
       InstanceType: t3.small
-      KeyName: !Ref SshKeyName
       BlockDeviceMappings:
         - DeviceName: "/dev/sdk"
           Ebs:
