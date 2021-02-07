@@ -8,18 +8,12 @@ Parameters:
     Type: String
 
   EC2AMI:
-    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
 
   EC2InstanceType:
     Type: String
     Default: "t2.micro"
-
-  SshKeyName:
-    Type: String
-
-  BastionHostExternalKey:
-    Type: String
 
 Resources:
   # Instance profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
@@ -30,14 +24,14 @@ Resources:
   #    Properties:
   #      Roles:
   #        - UdacityS3ReadOnlyEC2
+  # The setup of the bastion host needs a name of a key pair for accessing through SSH.
 
   LBSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow http to our load balancer
       VpcId:
-        Fn::ImportValue:
-          !Sub "${ProjectName}-VPCID"
+        Fn::ImportValue: !Sub "${ProjectName}-VPCID"
       SecurityGroupEgress:
         - IpProtocol: tcp
           FromPort: 80
@@ -54,8 +48,7 @@ Resources:
     Properties:
       GroupDescription: Allow http and SSH to our web servers
       VpcId:
-        Fn::ImportValue:
-          !Sub "${ProjectName}-VPCID"
+        Fn::ImportValue: !Sub "${ProjectName}-VPCID"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -83,7 +76,7 @@ Resources:
           cd /var/www/html
           echo "Udacity Demo Web Server Up and Running!" > index.html
 
-#      ImageId: ami-0a87a7625a4f44ffb
+      #      ImageId: ami-0a87a7625a4f44ffb
       ImageId: ami-07a29e5e945228fa1
       #      IamInstanceProfile: !Ref ProfileWithRolesForOurApp
       SecurityGroups:
@@ -93,7 +86,7 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: "/dev/sdk"
           Ebs:
-            VolumeSize: '10'
+            VolumeSize: "10"
 
   WebAppTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -114,14 +107,13 @@ Resources:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier:
-        - Fn::ImportValue:
-            !Sub "${ProjectName}-PRIVATE-NETS"
+        - Fn::ImportValue: !Sub "${ProjectName}-PRIVATE-NETS"
       LaunchConfigurationName:
         Ref: WebAppLaunchConfig
       TargetGroupARNs:
         - Ref: WebAppTargetGroup
-      MinSize: '1'
-      MaxSize: '1'
+      MinSize: "1"
+      MaxSize: "1"
 
   WebAppLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -139,8 +131,8 @@ Resources:
         - Fn::ImportValue: !Sub "${ProjectName}-BK-PUBLIC-SN"
       SecurityGroups:
         - Ref: LBSecGroup
-#
-#
+  #
+  #
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -150,84 +142,83 @@ Resources:
             Ref: WebAppTargetGroup
       LoadBalancerArn:
         Ref: WebAppLB
-      Port: '80'
+      Port: "80"
       Protocol: HTTP
-#
+  #
   ALBListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
       Actions:
         - Type: forward
-          TargetGroupArn: !Ref 'WebAppTargetGroup'
+          TargetGroupArn: !Ref "WebAppTargetGroup"
       Conditions:
         - Field: path-pattern
-          Values: [ / ]
-      ListenerArn: !Ref 'Listener'
+          Values: [/]
+      ListenerArn: !Ref "Listener"
       Priority: 1
 
-  BastionMainLogGroup:
-    Type: 'AWS::Logs::LogGroup'
+  # BastionMainLogGroup:
+  #   Type: 'AWS::Logs::LogGroup'
 
-  SSHMetricFilter:
-    Type: 'AWS::Logs::MetricFilter'
-    Properties:
-      LogGroupName: !Ref BastionMainLogGroup
-      FilterPattern: ON FROM USER PWD
-      MetricTransformations:
-        - MetricName: SSHCommandCount
-          MetricValue: '1'
-          MetricNamespace: !Sub "AWSQuickStart/${AWS::StackName}"
+  # SSHMetricFilter:
+  #   Type: 'AWS::Logs::MetricFilter'
+  #   Properties:
+  #     LogGroupName: !Ref BastionMainLogGroup
+  #     FilterPattern: ON FROM USER PWD
+  #     MetricTransformations:
+  #       - MetricName: SSHCommandCount
+  #         MetricValue: '1'
+  #         MetricNamespace: !Sub "AWSQuickStart/${AWS::StackName}"
 
-  BastionSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription:
-        !Sub 'Security group for ${AWS::StackName} bastion host'
-      VpcId:
-        Fn::ImportValue:
-          !Sub "${ProjectName}-VPCID"
+  # BastionSecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription:
+  #       !Sub 'Security group for ${AWS::StackName} bastion host'
+  #     VpcId:
+  #       Fn::ImportValue:
+  #         !Sub "${ProjectName}-VPCID"
 
-  BastionInstance:
-    Type: AWS::EC2::Instance
-    Properties:
-      ImageId: !Ref EC2AMI
-      InstanceType: !Ref EC2InstanceType
-      KeyName: !Ref BastionHostExternalKey
-      SubnetId:
-        Fn::ImportValue:
-          !Sub "${ProjectName}-MAIN-PUBLIC-SN"
-      SecurityGroupIds:
-        - !Ref BastionSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub '${AWS::StackName}-BastionInstance'
+  # BastionInstance:
+  #   Type: AWS::EC2::Instance
+  #   Properties:
+  #     ImageId: !Ref EC2AMI
+  #     InstanceType: !Ref EC2InstanceType
+  #     SubnetId:
+  #       Fn::ImportValue:
+  #         !Sub "${ProjectName}-MAIN-PUBLIC-SN"
+  #     SecurityGroupIds:
+  #       - !Ref BastionSecurityGroup
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub '${AWS::StackName}-BastionInstance'
 
-  BastionAllowInboundSSHFromInternet:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref BastionSecurityGroup
-      IpProtocol: tcp
-      FromPort: 22
-      ToPort: 22
-      CidrIp: 0.0.0.0/0
+  # BastionAllowInboundSSHFromInternet:
+  #   Type: AWS::EC2::SecurityGroupIngress
+  #   Properties:
+  #     GroupId: !Ref BastionSecurityGroup
+  #     IpProtocol: tcp
+  #     FromPort: 22
+  #     ToPort: 22
+  #     CidrIp: 0.0.0.0/0
 
-  BastionAllowOutboundSSHToApplication:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref BastionSecurityGroup
-      IpProtocol: tcp
-      FromPort: 22
-      ToPort: 22
-      DestinationSecurityGroupId: !Ref WebServerSecGroup
+  # BastionAllowOutboundSSHToApplication:
+  #   Type: AWS::EC2::SecurityGroupEgress
+  #   Properties:
+  #     GroupId: !Ref BastionSecurityGroup
+  #     IpProtocol: tcp
+  #     FromPort: 22
+  #     ToPort: 22
+  #     DestinationSecurityGroupId: !Ref WebServerSecGroup
 
-  ApplicationAllowInboundSSHFromBastion:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref WebServerSecGroup
-      IpProtocol: tcp
-      FromPort: 22
-      ToPort: 22
-      SourceSecurityGroupId: !Ref BastionSecurityGroup
+  # ApplicationAllowInboundSSHFromBastion:
+  #   Type: AWS::EC2::SecurityGroupIngress
+  #   Properties:
+  #     GroupId: !Ref WebServerSecGroup
+  #     IpProtocol: tcp
+  #     FromPort: 22
+  #     ToPort: 22
+  #     SourceSecurityGroupId: !Ref BastionSecurityGroup
 
 Outputs:
   LBSecGroup:
@@ -297,17 +288,15 @@ Outputs:
   SecurityGroupEgressBastionHost:
     Description: Security Group for bastion host to access web app
     Value: !Ref BastionAllowOutboundSSHToApplication
-
-
 #  BastionPublicIp:
 #    Description: 'Bastion Public IP'
 #    Value: !Sub 'http://${BastionInstance.PublicIp}'
 #    Export:
 #      Name: BastionPublicIp
-  # This is also optional.
-  # Bonus points for useful outputs!
-  # for example, if you create a Load Balancer
-  # it's nice to output the URL to it here, so that we don't have to go to the console to get it.
+# This is also optional.
+# Bonus points for useful outputs!
+# for example, if you create a Load Balancer
+# it's nice to output the URL to it here, so that we don't have to go to the console to get it.
 
 # Sample UserData
 # When creating your Launch Configuration, you may need a UserData script
