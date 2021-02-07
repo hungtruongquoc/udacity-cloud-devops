@@ -10,13 +10,5 @@
   {
     "ParameterKey": "EC2InstanceType",
     "ParameterValue": "t2.micro"
-  },
-  {
-    "ParameterKey": "SshKeyName",
-    "ParameterValue": "udacity-project-keys"
-  },
-  {
-    "ParameterKey": "BastionHostExternalKey",
-    "ParameterValue": "bastion_host_external"
   }
 ]
